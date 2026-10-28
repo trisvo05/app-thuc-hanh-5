@@ -1,97 +1,82 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Bài thực hành 5 – Chat 1-1 Realtime
 
-# Getting Started
+Ứng dụng React Native CLI (không dùng Expo) với Firebase Authentication, Firebase Realtime Database, React Navigation và chia sẻ vị trí thật.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Tình trạng source đầu vào
 
-## Step 1: Start Metro
+Workspace được cung cấp chỉ có template React Native 0.88.1 (`App.tsx` hiển thị `NewAppScreen`). Không có màn hình, bottom tabs, dữ liệu mẫu hoặc Firebase của Bài 4. Vì vậy màn hình Thông báo hiện là màn hình trống độc lập; cần đối chiếu với source Bài 4 nếu giảng viên yêu cầu giữ nguyên nội dung/giao diện gốc.
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Cấu hình Firebase Console
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+1. Cấu hình Web app của project `thuchanhapp-cbf76` đã được điền trong `src/config/firebaseConfig.ts`. Nếu dùng project khác, thay toàn bộ giá trị bằng cấu hình của project đó.
+2. Trong **Build > Authentication > Sign-in method**, bật **Email/Password**.
+3. Trong **Build > Realtime Database**, xác nhận database ở `asia-southeast1` đã được tạo và URL khớp `databaseURL` trong file cấu hình.
+4. Trong tab **Rules** của Realtime Database, triển khai nội dung `firebase-database.rules.json` do giảng viên cung cấp. File trong repo đã được cập nhật cho đúng rules này, nhưng chưa được triển khai lên Console. Rules trên server mới quyết định quyền; chỉ sửa file local sẽ không hết `Permission denied`.
+5. Không dùng test mode với root `.read: true` / `.write: true`. Không đưa service account key vào ứng dụng.
 
-```sh
-# Using npm
+Khi thiếu một trường cấu hình, app hiện màn hình “Cần cấu hình Firebase”; dữ liệu giả không được sử dụng.
+
+## Chạy Android
+
+Yêu cầu Node.js 22.11+, JDK và Android SDK đúng theo React Native CLI. Tại thư mục project:
+
+```powershell
+npm install
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
+Mở terminal khác:
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
+```powershell
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
+Cho phép quyền vị trí khi bấm nút 📍 trong Chat. AndroidManifest đã khai báo `ACCESS_FINE_LOCATION` và `ACCESS_COARSE_LOCATION`; iOS có mô tả `NSLocationWhenInUseUsageDescription`. Trên macOS, chạy `bundle exec pod install` trong `ios` sau khi cài dependency rồi `npm run ios`.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+## Cấu trúc dữ liệu
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+- `/users/{uid}`: UID, họ tên, email, avatar URL tùy chọn.
+- `/presence/{uid}`: `online`, `lastSeen`; `onDisconnect` đặt offline sau khi mất kết nối.
+- `/conversations/{sortedUidA}_{sortedUidB}`: `participants: {uidA: true, uidB: true}`, `createdAt`.
+- `/userConversations/{uid}/{conversationId}`: `peerId`, `updatedAt`, `unreadCount`, `lastReadMessageId`.
+- `/messages/{conversationId}/{pushKey}`: tin text hoặc location cùng server timestamp.
 
-```sh
-bundle install
+Home lấy conversation thật từ `userConversations`, nghe tin nhắn realtime và tính unread từ message nằm sau `lastReadMessageId`; không cộng dồn counter khi listener chạy lại. Khi gửi, message và `unreadCount` của người nhận được cập nhật nguyên tử bằng Firebase `increment(1)`. Khi mở Chat, cursor chuyển tới tin cuối đã hiển thị và `unreadCount` về 0. Tin nhắn của chính mình không được tính unread. Chat xóa ô nhập chỉ sau khi Firebase xác nhận gửi thành công.
+
+## Kiểm tra hai thiết bị
+
+Sau khi bật Email/Password, xác nhận Realtime Database và triển khai rules:
+
+1. Chạy app trên hai Android device/emulator cùng dùng Firebase project.
+2. Đăng ký A trên máy 1 và B trên máy 2; xác nhận `/users/{uid}` có hồ sơ và không có mật khẩu.
+3. Kiểm tra A thấy B trong Danh bạ và ngược lại. Thử tìm theo tên.
+4. Kiểm tra trạng thái online; ngắt mạng hoặc đóng app một máy và chờ trạng thái offline qua `onDisconnect`, sau đó kết nối lại.
+5. A gửi text, B nhận ngay; B trả lời, A nhận ngay. So sánh cả hai màn hình để chắc không trùng tin.
+6. A gửi vị trí sau khi cấp quyền. B chạm tin vị trí và kiểm tra Google Maps mở đúng tọa độ. Thử từ chối quyền và thử khi GPS tắt.
+7. Để B ở Home, A gửi thêm tin. Kiểm tra last message, thời gian, unread. B mở Chat thì unread về 0. Gửi tin từ B và xác nhận unread của B không tự tăng.
+8. Đăng xuất ở Settings, kiểm tra quay về Login và nút Back không mở màn hình nội bộ.
+9. Xem log và Firebase Console để bảo đảm thao tác hợp lệ không có `permission_denied`.
+
+## Kiểm tra mã
+
+```powershell
+npm exec -- tsc --noEmit
+npm run lint
+npm test -- --runInBand
+cd android
+.\gradlew.bat assembleDebug
 ```
 
-Then, and every time you update your native dependencies, run:
+Các bài test tự động kiểm tra màn hình khi chưa cấu hình Firebase, quy tắc tạo conversation ID và unread cursor. Tích hợp Firebase thật, quyền GPS, presence và kiểm tra hai máy cần Firebase config, rules đã triển khai và thiết bị thật/emulator; không thể kết luận chỉ từ unit test.
 
-```sh
-bundle exec pod install
+Để kiểm thử rules trên Realtime Database emulator cục bộ (không chạm dữ liệu production), chạy:
+
+```powershell
+npm exec --yes --package firebase-tools@14.20.0 -- firebase emulators:start --only database --project demo-chat
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+Trong terminal khác chạy `npm run test:rules`. Smoke test kiểm tra hồ sơ, conversation, presence, text/location message, unread và chặn người ngoài đọc tin nhắn.
 
-```sh
-# Using npm
-npm run ios
+## Hướng dẫn nộp bài
 
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Nộp source project (không nộp `node_modules`, build output hay service account key), `firebase-database.rules.json`, ảnh/video hai thiết bị trao đổi tin text và vị trí, ảnh Home unread trước/sau khi mở Chat, và ảnh trạng thái online/offline. Ghi rõ Firebase project dùng để chấm và bảo đảm Email/Password, Realtime Database cùng rules đã bật. Nếu cần giao diện Thông báo Bài 4, bổ sung source màn hình đó trước khi nộp.

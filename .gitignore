@@ -66,6 +66,12 @@ yarn-error.log
 # testing
 /coverage
 
+# Firebase Local Emulator Suite logs
+firebase-debug.log
+database-debug.log
+ui-debug.log
+firebase-debug.*.log
+
 # Yarn
 .yarn/*
 !.yarn/patches
