@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {StyleSheet, Text} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator, NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -12,6 +12,8 @@ import {NotificationsScreen} from '../screens/NotificationsScreen';
 import {SettingsScreen} from '../screens/SettingsScreen';
 import {colors} from '../ui/theme';
 import {AuthAccount} from '../services/authService';
+import {getConversationPeer} from '../services/chatService';
+import {AppNotification, subscribeNotifications} from '../services/notificationService';
 
 export type RootStackParams = {Tabs: undefined; Chat: {peer: UserProfile}};
 const Stack = createNativeStackNavigator<RootStackParams>();
@@ -25,10 +27,13 @@ const tabIcons: Record<string, ({color}: {color: string}) => React.JSX.Element> 
   Settings: ({color}) => <TabIcon name="Settings" color={color} />,
 };
 function Tabs({uid, profile, navigation}: {uid: string; profile: UserProfile; navigation: NativeStackNavigationProp<RootStackParams, 'Tabs'>}) {
+  const [unread, setUnread] = useState(0);
+  useEffect(() => subscribeNotifications(uid, items => setUnread(items.filter((item: AppNotification) => !item.read).length), error => console.warn(error)), [uid]);
+  const openConversation = async (id: string) => {try {const peer = await getConversationPeer(uid, id); navigation.navigate('Chat', {peer});} catch (error) {console.warn(error);}};
   return <Tab.Navigator screenOptions={({route}) => ({tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.muted, headerShown: false, tabBarIcon: tabIcons[route.name]})}>
     <Tab.Screen name="Home" options={{title: 'Tin nhắn'}}>{() => <HomeScreen uid={uid} openChat={peer => navigation.navigate('Chat', {peer})} />}</Tab.Screen>
     <Tab.Screen name="Contacts" options={{title: 'Danh bạ'}}>{() => <ContactsScreen uid={uid} openChat={peer => navigation.navigate('Chat', {peer})} />}</Tab.Screen>
-    <Tab.Screen name="Notifications" component={NotificationsScreen} options={{title: 'Thông báo'}} />
+    <Tab.Screen name="Notifications" options={{title: 'Thông báo', tabBarBadge: unread || undefined}}>{() => <NotificationsScreen uid={uid} openConversation={openConversation} />}</Tab.Screen>
     <Tab.Screen name="Settings" options={{title: 'Cài đặt'}}>{() => <SettingsScreen profile={profile} />}</Tab.Screen>
   </Tab.Navigator>;
 }

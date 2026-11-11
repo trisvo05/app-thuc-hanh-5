@@ -34,3 +34,6 @@ export function subscribePresence(update: (online: Record<string, boolean>) => v
     update(result);
   }, error);
 }
+export function subscribePresenceDetails(uid: string, callback: (value: {online: boolean; lastSeen: number | null}) => void, error: (error: Error) => void) {
+  return onValue(ref(db(), `presence/${uid}`), snap => {const value = snap.val(); callback({online: value?.online === true, lastSeen: value?.lastSeen ?? null});}, error);
+}

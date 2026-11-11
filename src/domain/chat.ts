@@ -2,10 +2,13 @@ export type ChatMessage = {
   id: string;
   senderId: string;
   receiverId: string;
-  type: 'text' | 'location';
+  type: 'text' | 'location' | 'image';
   text?: string;
   latitude?: number;
   longitude?: number;
+  imageUrl?: string;
+  recalled?: boolean;
+  reactions?: Record<string, string>;
   createdAt: number;
 };
 export function conversationId(uid1: string, uid2: string) {return [uid1, uid2].sort().join('_');}
